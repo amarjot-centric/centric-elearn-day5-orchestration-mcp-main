@@ -71,6 +71,10 @@ jobs:
         working-directory: e2e
         run: npx playwright install --with-deps chromium
 
+      # Playwright starts the API before globalSetup runs, so the schema must already exist.
+      - name: Reset E2E database
+        run: bash e2e/scripts/reset-e2e-db.sh
+
       - name: E2E tests
         working-directory: e2e
         env:
