@@ -320,6 +320,52 @@ public class ShopTests
     }
 
     [Fact]
+    public void R18_Refund_WindowRunsFromPurchase_EvenIfOrderUpdatedAtMoved()
+    {
+        using var env = new TestEnv();
+        env.AddToCart("Asha", 2);
+        var orderId = env.Shop.Checkout("Asha", null).Order!.Id;
+
+        // Something touches the order on day 6; the refund window must not restart from there.
+        env.Db.Orders.First(o => o.Id == orderId).UpdatedAt = Today.AddDays(6);
+        env.Db.SaveChanges();
+
+        env.Clock.Now = Today.AddDays(8);
+        var result = env.Shop.RefundOrder(orderId);
+        Assert.Null(result.Order);
+        Assert.Contains("within 7 days", result.Error);
+        Assert.Equal("Paid", env.Db.Orders.First(o => o.Id == orderId).Status);
+        Assert.Empty(env.Db.Refunds);
+    }
+
+    [Fact]
+    public void R18_Refund_IsRefused_WhenOneCourseOfSeveralIsOverTheProgressLimit()
+    {
+        using var env = new TestEnv();
+        env.AddToCart("Asha", 2, 4);
+        var orderId = env.Shop.Checkout("Asha", null).Order!.Id;
+        env.CompleteLessons("Asha", 4, 2); // 40% of course 4, nothing in course 2
+
+        var result = env.Shop.RefundOrder(orderId);
+        Assert.Null(result.Order);
+        Assert.Contains("Data Analysis with SQL", result.Error);
+        Assert.Equal("Paid", env.Db.Orders.First(o => o.Id == orderId).Status);
+        Assert.Empty(env.Db.Refunds);
+        Assert.Equal(2, env.Db.Enrollments.Count(e => e.Student.FullName == "Asha" && (e.CourseId == 2 || e.CourseId == 4)));
+    }
+
+    [Fact]
+    public void R18_Refund_IsAllowed_WhenProgressIsUnderTheLimit()
+    {
+        using var env = new TestEnv();
+        env.AddToCart("Asha", 4); // 5 lessons
+        var orderId = env.Shop.Checkout("Asha", null).Order!.Id;
+        env.CompleteLessons("Asha", 4, 1); // 20%
+
+        Assert.NotNull(env.Shop.RefundOrder(orderId).Order);
+    }
+
+    [Fact]
     public void R18_Refund_Twice_IsAConflict_AndUnknownOrderIsNotFound()
     {
         using var env = new TestEnv();

@@ -305,7 +305,8 @@ public class ShopService
         if (order is null) return (null, "Order not found.");
         if (order.Status == "Refunded") return (null, "This order was already refunded.");
         var now = _clock.UtcNow;
-        if (now - order.UpdatedAt > TimeSpan.FromDays(RefundDays))
+        // The window runs from purchase; UpdatedAt moves whenever the order is touched and must not reset it.
+        if (now - order.CreatedAt > TimeSpan.FromDays(RefundDays))
             return (null, $"Refunds are only possible within {RefundDays} days of the order.");
 
         foreach (var line in order.Lines)
