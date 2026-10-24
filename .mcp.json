@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "learnhub-db": {
-      "command": "python",
-      "args": ["mcp/server.py"]
+      "command": "node",
+      "args": ["mcp/dist/server.js"]
     }
   }
 }
