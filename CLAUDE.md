@@ -23,6 +23,10 @@ cd backend && dotnet test --filter "FullyQualifiedName~ShopTests.MethodName" # o
 
 # Frontend (http://localhost:5173, proxies /api to :5080)
 cd frontend && npm install && npm run dev
+
+# E2E (Playwright; resets learnhub_e2e only, never learnhub; starts API + frontend itself)
+cd e2e && npm install && npm run test:smoke   # @smoke tests (refund, checkout)
+cd e2e && npm test                            # all E2E tests
 ```
 
 Environment variables for the API:

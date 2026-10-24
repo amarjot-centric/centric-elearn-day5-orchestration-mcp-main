@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: 'LearnHub!23'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pLearnHub!23"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # Used by the E2E reset script and the Playwright config (the E2E database is learnhub_e2e only).
+      LEARNHUB_DB_HOST: 127.0.0.1
+      LEARNHUB_DB_PORT: 3306
+      LEARNHUB_DB_USER: test
+      LEARNHUB_DB_PASSWORD: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Create the E2E database and its restricted user
+        env:
+          MYSQL_PWD: 'LearnHub!23'
+        run: |
+          mysql -h127.0.0.1 -P3306 -uroot --default-character-set=utf8mb4 <<'SQL'
+          CREATE DATABASE IF NOT EXISTS learnhub_e2e CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          CREATE USER IF NOT EXISTS 'test'@'%' IDENTIFIED BY 'test';
+          GRANT ALL PRIVILEGES ON learnhub_e2e.* TO 'test'@'%';
+          FLUSH PRIVILEGES;
+          SQL
+
+      - name: Backend tests
+        working-directory: backend
+        run: dotnet test
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install E2E dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        working-directory: e2e
+        env:
+          DOTNET_ROLL_FORWARD: Major
+        run: npm test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 7
