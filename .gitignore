@@ -1,0 +1,12 @@
+bin/
+obj/
+node_modules/
+dist/
+.vs/
+.idea/
+*.user
+.DS_Store
+CLAUDE.local.md
+__pycache__/
+*.pyc
+.venv/
